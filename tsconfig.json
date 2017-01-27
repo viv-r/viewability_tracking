@@ -4,6 +4,7 @@
         "target": "es5",
         "jsx": "react",
         "noImplicitAny": true,
-        "sourceMap": false
+        "sourceMap": false,
+        "baseUrl": "./src/"
     }
 }

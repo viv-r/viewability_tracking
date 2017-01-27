@@ -1,11 +1,14 @@
 const configuration = {
     resolve: {
-        extensions: [".tsx", ".ts", ".js"],
+        extensions: [".tsx", ".ts", ".js"]
     },
     module: {
         rules: [{
             test: /\.tsx?/,
-            loader: "awesome-typescript-loader"
+            loader: "awesome-typescript-loader",
+            options: {
+                configFileName: "tsconfig.json"
+            }
         }],
     },
     watch: true,

@@ -4,12 +4,13 @@ import { createServer } from "http";
 const html = `
     <html>
         <head>
-            <title>KQ</title>
+            <title> App </title>
+            <style> body { margin: 0 } </style>
         </head>
         <body>
             <div id="root"></div>
             <script>
-            ${ readFileSync("./out/client.js").toString() }
+                ${ readFileSync("./out/client.js").toString() }
             </script>
         </body>
     </html>
