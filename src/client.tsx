@@ -34,15 +34,33 @@ const totalDivs = 1500;
 const sampleDistance = 100;
 const throttleTimeout = 200;
 const viewThreshold = 0.75;
+const divMeta = {};
 
 function isInViewPort(rect: any, windowWidth: number, windowHeight: number) {
-    const intersectionWidth = Math.min(Math.max(rect.right,0), windowWidth) - Math.min(Math.max(rect.left,0), windowWidth);
-    const intersectionHeight = Math.min(Math.max(rect.bottom,0), windowHeight) - Math.min(Math.max(rect.top,0), windowHeight);
+    const intersectionWidth = Math.min(Math.max(rect.right, 0), windowWidth) - Math.min(Math.max(rect.left, 0), windowWidth);
+    const intersectionHeight = Math.min(Math.max(rect.bottom, 0), windowHeight) - Math.min(Math.max(rect.top, 0), windowHeight);
     const intersectionArea = ((intersectionHeight * intersectionWidth) / (rect.height * rect.width)) * 100;
     if (intersectionArea > 50) {
         return true;
     }
     return false;
+}
+
+function storeDivInfo(allDivs: Element[]) {
+    for (let i = 0; i < allDivs.length; i++) {
+        if (divMeta[allDivs[i].dataset.index]) {
+            divMeta[allDivs[i].dataset.index].push({
+                currentTime: new Date().getTime(),
+                visibility: allDivs[i].innerHTML
+            });
+        } else {
+            divMeta[allDivs[i].dataset.index] = [{
+                currentTime: new Date().getTime(),
+                visibility: allDivs[i].innerHTML
+            }];
+        }
+    }
+    console.log(divMeta);
 }
 function animationFrameCallback() {
     window.requestAnimationFrame(() => {
@@ -55,56 +73,60 @@ function animationFrameCallback() {
         // tslint:disable-next-line:prefer-for-of
         for (let i = 0; i < allDivs.length; i++) {
             const rect = allDivs[i].getBoundingClientRect();
+            if (rect.right < 0 || rect.bottom < 0 || rect.left > viewportWidth || rect.top > viewportHeight) {
+                continue;
+            }
             if (!isInViewPort(rect, viewportWidth, viewportHeight)) {
                 continue;
             }
-            // if (rect.right < 0 || rect.bottom < 0 || rect.left > viewportWidth || rect.top > viewportHeight) {
-            //     continue;
-            // }
             divs.push(allDivs[i]);
             rects.push(rect);
         }
 
         console.log("sampling for " + divs.length + " elements");
 
+        // Store divs information
+        storeDivInfo(divs);
         for (let i = 0; i < rects.length; i++) {
             // console.time("rect");
             const rect = rects[i];
-            const pointsToCheck: IPoint[] = [];
 
             const pointsOnX = Math.min(10, Math.ceil(rect.width / sampleDistance));
             const pointsOnY = Math.min(10, Math.ceil(rect.height / sampleDistance));
             const jumpX = rect.width / (pointsOnX + 1);
             const jumpY = rect.height / (pointsOnY + 1);
 
-            // console.log("metrics", pointsOnX, pointsOnY, jumpX, jumpY, rect);
+            const pointsToCheck: number = pointsOnX * pointsOnY;
+            let inView: number = pointsToCheck;
 
             for (let a = 0; a < pointsOnX; a++) {
                 for (let b = 0; b < pointsOnY; b++) {
                     const x = Math.round(rect.left + jumpX * (a + 1));
                     const y = Math.round(rect.top + jumpY * (b + 1));
-                    pointsToCheck.push({x, y});
-                }
-            }
-            // if (pointsToCheck.length < 5) {
-            //     console.warn("probably too few points: " + pointsToCheck.length, rect);
-            // }
-            let inView: number = pointsToCheck.length;
-            // tslint:disable-next-line:prefer-for-of
-            for (let j = 0; j < pointsToCheck.length; j++) {
-                const {x, y} = pointsToCheck[j];
 
-                if (x < 0 || y < 0 || x > viewportWidth || y > viewportHeight ||
-                    document.elementFromPoint(x, y) !== divs[i]) {
-                    inView--;
+                    const item = document.elementFromPoint(x, y);
+                    if (x < 0 || y < 0 || x > viewportWidth || y > viewportHeight) {
+                        let isViewed = false;
+                        for (let k = item; k !== null; k = k.parentElement) {
+                            if (k === divs[i]) {
+                                isViewed = true;
+                                break;
+                            }
+                        }
+                        if (!isViewed) {
+                            inView--;
+                        }
+                    }
                 }
             }
-            if (inView > pointsToCheck.length * viewThreshold) {
+
+            // tslint:disable-next-line:prefer-for-of
+            if (inView > pointsToCheck * viewThreshold) {
                 divs[i].className = styles.inview;
             } else {
                 divs[i].className = null;
             }
-            //divs[i].innerHTML = Math.round(inView * 100 / pointsToCheck.length) + "%";
+            divs[i].innerHTML = Math.round(inView * 100 / pointsToCheck) + "%";
             // console.timeEnd("rect");
         }
         console.timeEnd("animationFrame");
@@ -160,8 +182,8 @@ function makeDivs(max: number) {
             alignItems: "center",
             top: `${Math.random() * 5000}px`,
             left: `${Math.random() * 5000}px`,
-            width: `${Math.random() * 1500}px`,
-            height: `${Math.random() * 1500}px`,
+            width: `${Math.random() * 500}px`,
+            height: `${Math.random() * 500}px`,
             fontSize: "64px",
             // tslint:disable-next-line:max-line-length
             backgroundColor: `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}`,
@@ -170,14 +192,15 @@ function makeDivs(max: number) {
         };
 
         divs.push(
-            <div 
+            <div
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 key={i}
+                data-index={i}
                 style={style}
                 data-tracking
-            />,
+                />,
         );
     }
     return divs;
