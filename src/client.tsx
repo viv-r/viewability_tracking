@@ -25,43 +25,48 @@ function throttle(callback: (a: any) => any, limit: number) {
     };
 }
 
-interface IPoint {
-    x: number;
-    y: number;
-};
+interface TrackingInfo {
+    visibility: number;
+    currentTime: number;
+}
 
-const totalDivs = 1500;
-const sampleDistance = 100;
+interface TrackingHistory {
+    [id: string]: TrackingInfo[];
+}
+
+const totalDivs = 300;
+const sampleDistance = 10;
 const throttleTimeout = 200;
 const viewThreshold = 0.75;
-const divMeta = {};
+const trackingHistory: TrackingHistory = {};
 
-function isInViewPort(rect: any, windowWidth: number, windowHeight: number) {
-    const intersectionWidth = Math.min(Math.max(rect.right, 0), windowWidth) - Math.min(Math.max(rect.left, 0), windowWidth);
-    const intersectionHeight = Math.min(Math.max(rect.bottom, 0), windowHeight) - Math.min(Math.max(rect.top, 0), windowHeight);
-    const intersectionArea = ((intersectionHeight * intersectionWidth) / (rect.height * rect.width)) * 100;
-    if (intersectionArea > 50) {
-        return true;
-    }
-    return false;
+function isInViewPort(rect: ClientRect, windowWidth: number, windowHeight: number) {
+    const intersectionWidth =
+        Math.min(Math.max(rect.right, 0), windowWidth) -
+        Math.min(Math.max(rect.left, 0), windowWidth);
+    const intersectionHeight =
+        Math.min(Math.max(rect.bottom, 0), windowHeight) -
+        Math.min(Math.max(rect.top, 0), windowHeight);
+    const intersectionArea = ((intersectionHeight * intersectionWidth) /
+        (rect.height * rect.width)) * 100;
+
+    return intersectionArea > 50;
 }
 
-function storeDivInfo(allDivs: Element[]) {
-    for (let i = 0; i < allDivs.length; i++) {
-        if (divMeta[allDivs[i].dataset.index]) {
-            divMeta[allDivs[i].dataset.index].push({
-                currentTime: new Date().getTime(),
-                visibility: allDivs[i].innerHTML
-            });
-        } else {
-            divMeta[allDivs[i].dataset.index] = [{
-                currentTime: new Date().getTime(),
-                visibility: allDivs[i].innerHTML
-            }];
-        }
+function storeDivInfo(div: Element, visibility: number) {
+    const id = div.getAttribute("data-index");
+    const info: TrackingInfo = {
+        currentTime: new Date().getTime(),
+        visibility,
+    };
+
+    if (trackingHistory[id]) {
+        trackingHistory[id].push(info);
+    } else {
+        trackingHistory[id] = [info];
     }
-    console.log(divMeta);
 }
+
 function animationFrameCallback() {
     window.requestAnimationFrame(() => {
         console.time("animationFrame");
@@ -70,25 +75,22 @@ function animationFrameCallback() {
         const viewportHeight = window.innerHeight;
         const divs = [];
         const rects: ClientRect[] = [];
-        // tslint:disable-next-line:prefer-for-of
+
         for (let i = 0; i < allDivs.length; i++) {
             const rect = allDivs[i].getBoundingClientRect();
             if (rect.right < 0 || rect.bottom < 0 || rect.left > viewportWidth || rect.top > viewportHeight) {
                 continue;
             }
-            if (!isInViewPort(rect, viewportWidth, viewportHeight)) {
-                continue;
-            }
+            // if (!isInViewPort(rect, viewportWidth, viewportHeight)) {
+            //     continue;
+            // }
             divs.push(allDivs[i]);
             rects.push(rect);
         }
 
         console.log("sampling for " + divs.length + " elements");
 
-        // Store divs information
-        storeDivInfo(divs);
         for (let i = 0; i < rects.length; i++) {
-            // console.time("rect");
             const rect = rects[i];
 
             const pointsOnX = Math.min(10, Math.ceil(rect.width / sampleDistance));
@@ -105,7 +107,7 @@ function animationFrameCallback() {
                     const y = Math.round(rect.top + jumpY * (b + 1));
 
                     const item = document.elementFromPoint(x, y);
-                    if (x < 0 || y < 0 || x > viewportWidth || y > viewportHeight) {
+                    if (x > 0 || y > 0 || x < viewportWidth || y < viewportHeight) {
                         let isViewed = false;
                         for (let k = item; k !== null; k = k.parentElement) {
                             if (k === divs[i]) {
@@ -120,14 +122,15 @@ function animationFrameCallback() {
                 }
             }
 
-            // tslint:disable-next-line:prefer-for-of
             if (inView > pointsToCheck * viewThreshold) {
                 divs[i].className = styles.inview;
             } else {
                 divs[i].className = null;
             }
-            divs[i].innerHTML = Math.round(inView * 100 / pointsToCheck) + "%";
-            // console.timeEnd("rect");
+
+            const visibility = Math.round(inView * 100 / pointsToCheck);
+            divs[i].innerHTML = visibility + "%";
+            storeDivInfo(divs[i], visibility)
         }
         console.timeEnd("animationFrame");
     });
@@ -180,13 +183,13 @@ function makeDivs(max: number) {
             display: "flex",
             justifyContent: "center" as "center",
             alignItems: "center",
-            top: `${Math.random() * 5000}px`,
-            left: `${Math.random() * 5000}px`,
-            width: `${Math.random() * 500}px`,
-            height: `${Math.random() * 500}px`,
-            fontSize: "64px",
+            top: `${ Math.random() * 3000 }px`,
+            left: `${ Math.random() * 3000 }px`,
+            width: `${ Math.random() * 300 }px`,
+            height: `${ Math.random() * 300 }px`,
+            fontSize: "32px",
             // tslint:disable-next-line:max-line-length
-            backgroundColor: `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}`,
+            backgroundColor: `rgb(${ Math.floor(Math.random() * 255) }, ${ Math.floor(Math.random() * 255) }, ${ Math.floor(Math.random() * 255) }`,
             opacity: 0.5,
             border: "1px solid #aaa",
         };
@@ -200,7 +203,7 @@ function makeDivs(max: number) {
                 data-index={i}
                 style={style}
                 data-tracking
-                />,
+            />,
         );
     }
     return divs;

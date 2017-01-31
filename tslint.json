@@ -1,9 +1,13 @@
 {
-    "extends": ["tslint:latest", "tslint-react"],
+    "extends": [
+        "tslint:latest",
+        "tslint-react"
+    ],
     "rules": {
         "no-console": [
             false
         ],
-        "object-literal-sort-keys": false
+        "object-literal-sort-keys": false,
+        "prefer-for-of": false
     }
 }
